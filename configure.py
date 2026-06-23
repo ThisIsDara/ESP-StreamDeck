@@ -72,7 +72,7 @@ def edit_settings():
     save_config(cfg)
 
 def install_deps():
-    pkgs = ["pyserial", "comtypes", "pycaw", "zeroconf", "dnslib"]
+    pkgs = ["pyserial", "comtypes", "pycaw", "zeroconf"]
     p("Installing dependencies...", color=YELLOW)
     for pkg in pkgs:
         print(f"  {pkg}...", end=" ", flush=True)
@@ -130,7 +130,7 @@ def show_status():
     except:
         print(f"{YELLOW}Unknown (run agent to detect){RESET}")
     print(f"  {BOLD}Dependencies:{RESET}")
-    for pkg in ["serial", "zeroconf", "dnslib", "comtypes", "pycaw"]:
+    for pkg in ["serial", "zeroconf", "comtypes", "pycaw"]:
         try:
             __import__(pkg)
             print(f"    {pkg}: {GREEN}OK{RESET}")

@@ -70,58 +70,84 @@ except ImportError:
     def stop_mdns(): pass
     logging.info("mDNS: pip install zeroconf to enable")
 
-# --- DNS forwarder ---
+# --- DNS forwarder (zero deps) ---
 _dns_stop = None
 _dns_thread = None
-try:
-    from dnslib import DNSRecord, DNSHeader, A, RR, QTYPE
-    import socket as _sock2, threading
-    def start_dns(ip):
-        global _dns_stop, _dns_thread
-        if _dns_thread and _dns_thread.is_alive():
-            _dns_stop.set()
-            _dns_thread.join(timeout=3)
-        _dns_stop = threading.Event()
-        _dns_thread = threading.Thread(target=_dns_worker, args=(ip, _dns_stop), daemon=True)
-        _dns_thread.start()
-    def stop_dns():
-        if _dns_stop:
-            _dns_stop.set()
-    def _dns_worker(ip, stop):
-        sock = _sock2.socket(_sock2.AF_INET, _sock2.SOCK_DGRAM)
+import socket as _sock2, threading, struct as _struct
+
+def _dns_build_response(tid, qname_raw, qtype, qclass, answer_ip):
+    flags = _struct.pack('>H', 0x8180)  # response, no error
+    qdcount = _struct.pack('>H', 1)
+    ancount = _struct.pack('>H', 1)
+    nscount = _struct.pack('>H', 0)
+    arcount = _struct.pack('>H', 0)
+    header = _struct.pack('>H', tid) + flags + qdcount + ancount + nscount + arcount
+    answer_name = qname_raw
+    answer_type = _struct.pack('>H', qtype)
+    answer_class = _struct.pack('>H', qclass)
+    ttl = _struct.pack('>I', 30)
+    rdlen = _struct.pack('>H', 4)
+    rdata = _sock2.inet_aton(answer_ip)
+    answer = answer_name + answer_type + answer_class + ttl + rdlen + rdata
+    return header + qname_raw + answer
+
+def _dns_parse_question(data):
+    pos = 12
+    qname_parts = []
+    while pos < len(data):
+        l = data[pos]
+        if l == 0:
+            pos += 1
+            break
+        pos += 1
+        qname_parts.append(data[pos:pos+l].decode('ascii', errors='ignore'))
+        pos += l
+    qname = '.'.join(qname_parts)
+    qtype, qclass = _struct.unpack('>HH', data[pos:pos+4])
+    return qname, qtype, qclass, data[12:pos+4]
+
+def start_dns(ip):
+    global _dns_stop, _dns_thread
+    if _dns_thread and _dns_thread.is_alive():
+        _dns_stop.set()
+        _dns_thread.join(timeout=3)
+    _dns_stop = threading.Event()
+    _dns_thread = threading.Thread(target=_dns_worker, args=(ip, _dns_stop), daemon=True)
+    _dns_thread.start()
+
+def stop_dns():
+    if _dns_stop:
+        _dns_stop.set()
+
+def _dns_worker(ip, stop):
+    sock = _sock2.socket(_sock2.AF_INET, _sock2.SOCK_DGRAM)
+    try:
+        sock.bind(('0.0.0.0', 53))
+    except PermissionError:
+        return
+    sock.settimeout(1)
+    fqdn = f"{MDNS_NAME}.local"
+    names = (fqdn.lower(), MDNS_NAME.lower())
+    logging.info(f"DNS: {fqdn} -> {ip}")
+    while not stop.is_set():
         try:
-            sock.bind(('0.0.0.0', 53))
-        except PermissionError:
-            return
-        sock.settimeout(1)
-        fqdn = f"{MDNS_NAME}.local"
-        names = (fqdn.lower(), MDNS_NAME.lower())
-        logging.info(f"DNS: {fqdn} -> {ip}")
-        while not stop.is_set():
-            try:
-                data, addr = sock.recvfrom(512)
-                req = DNSRecord.parse(data)
-                q = req.q
-                qn = str(q.qname).rstrip('.').lower()
-                if q.qtype == QTYPE.A and qn in names:
-                    reply = DNSRecord(DNSHeader(id=req.header.id, qr=1, aa=1, ra=1), q=req.q)
-                    reply.add_answer(RR(q.qname, QTYPE.A, ttl=30, rdata=A(ip)))
-                    sock.sendto(reply.pack(), addr)
-                else:
-                    fs = _sock2.socket(_sock2.AF_INET, _sock2.SOCK_DGRAM)
-                    fs.settimeout(2)
-                    try:
-                        fs.sendto(data, ('8.8.8.8', 53))
-                        rd, _ = fs.recvfrom(512)
-                        sock.sendto(rd, addr)
-                    except: pass
-                    finally: fs.close()
-            except _sock2.timeout: continue
-            except Exception as e: logging.warning(f"DNS: {e}")
-except ImportError:
-    def start_dns(ip): pass
-    def stop_dns(): pass
-    logging.info("DNS: pip install dnslib for DNS forwarder")
+            data, addr = sock.recvfrom(512)
+            tid = _struct.unpack('>H', data[:2])[0]
+            qname, qtype, qclass, qraw = _dns_parse_question(data)
+            if qtype == 1 and qclass == 1 and qname.lower() in names:
+                reply = _dns_build_response(tid, qraw, qtype, qclass, ip)
+                sock.sendto(reply, addr)
+            else:
+                fs = _sock2.socket(_sock2.AF_INET, _sock2.SOCK_DGRAM)
+                fs.settimeout(2)
+                try:
+                    fs.sendto(data, ('8.8.8.8', 53))
+                    rd, _ = fs.recvfrom(512)
+                    sock.sendto(rd, addr)
+                except: pass
+                finally: fs.close()
+        except _sock2.timeout: continue
+        except Exception as e: logging.warning(f"DNS: {e}")
 
 # --- Core Audio COM volume (silent, no OSD) ---
 user32 = ctypes.windll.user32
