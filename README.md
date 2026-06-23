@@ -1,7 +1,10 @@
 # ESP-StreamDeck
 
-ESP32-powered wireless Stream Deck controlled from any device with a browser — no proprietary hardware needed.
+ESP32-powered wireless Stream Deck — **work in progress**.
 
+Currently prototyping with a phone browser as the touchscreen UI. Plan to add a physical TFT display, rotary knobs, and tactile buttons later for a self-contained device.
+
+![Status](https://img.shields.io/badge/Status-WIP-yellow)
 ![Hardware](https://img.shields.io/badge/Hardware-ESP32--WROOM-blue)
 ![Web](https://img.shields.io/badge/UI-Web%20SPA-orange)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
@@ -16,7 +19,7 @@ ESP32-powered wireless Stream Deck controlled from any device with a browser —
 └──────────────┘                └──────────┘              └──────────────────┘
 ```
 
-- **Android phone (or any browser)**: Touchscreen Stream Deck UI via WebSocket
+- **Android phone (or any browser)**: Touchscreen Stream Deck UI via WebSocket (placeholder until physical TFT arrives)
 - **ESP32**: Serves the web UI, relays button presses over serial
 - **PC Agent** (`pc_agent.py`): Receives serial commands and executes them on Windows
 
