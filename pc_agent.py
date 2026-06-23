@@ -1,10 +1,6 @@
 """
 Stream Deck PC Agent v2
 Reads serial commands from ESP32, executes them on Windows.
-Usage:
-  python pc_agent.py              # auto-detect
-  python pc_agent.py --port COM3
-  python pc_agent.py --list
 """
 
 import sys, time, argparse, logging, subprocess, ctypes, os, re
@@ -20,8 +16,33 @@ logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%
 
 _script_dir = os.path.dirname(os.path.abspath(__file__))
 _esp_ip_file = os.path.join(_script_dir, 'esp_ip.txt')
+_config_file = os.path.join(_script_dir, 'config.json')
 
-# --- mDNS registration for streamdeck.local ---
+def load_config():
+    default = {
+        "mdns_name": "streamdeck",
+        "serial_port": "auto",
+        "serial_baud": 115200,
+        "serial_timeout": 0.05,
+        "volume_step": 0.05
+    }
+    try:
+        with open(_config_file) as f:
+            import json
+            cfg = json.load(f)
+            default.update(cfg)
+    except:
+        pass
+    return default
+
+cfg = load_config()
+MDNS_NAME = cfg["mdns_name"]
+SERIAL_PORT = cfg["serial_port"]
+SERIAL_BAUD = cfg["serial_baud"]
+SERIAL_TIMEOUT = cfg["serial_timeout"]
+VOLUME_STEP = cfg["volume_step"]
+
+# --- mDNS registration ---
 _mdns = None
 try:
     from zeroconf import Zeroconf, ServiceInfo
@@ -31,11 +52,12 @@ try:
         try:
             if _mdns:
                 _mdns.close()
-            info = ServiceInfo("_http._tcp.local.", "StreamDeck._http._tcp.local.",
-                               addresses=[_sock.inet_aton(ip)], port=80, server="streamdeck.local.")
+            host = f"{MDNS_NAME}.local."
+            info = ServiceInfo("_http._tcp.local.", f"{MDNS_NAME}._http._tcp.local.",
+                               addresses=[_sock.inet_aton(ip)], port=80, server=host)
             _mdns = Zeroconf()
             _mdns.register_service(info)
-            logging.info(f"mDNS: streamdeck.local -> {ip}")
+            logging.info(f"mDNS: {MDNS_NAME}.local -> {ip}")
         except Exception as e:
             logging.warning(f"mDNS failed: {e}")
     def stop_mdns():
@@ -46,9 +68,9 @@ try:
 except ImportError:
     def start_mdns(ip): pass
     def stop_mdns(): pass
-    logging.info("mDNS: pip install zeroconf to enable streamdeck.local")
+    logging.info("mDNS: pip install zeroconf to enable")
 
-# --- DNS forwarder: resolves streamdeck.local, forwards everything else ---
+# --- DNS forwarder ---
 _dns_stop = None
 _dns_thread = None
 try:
@@ -70,17 +92,18 @@ try:
         try:
             sock.bind(('0.0.0.0', 53))
         except PermissionError:
-            logging.warning("DNS: run as admin for port 53, then set phone DNS to PC IP")
             return
         sock.settimeout(1)
-        logging.info(f"DNS: streamdeck.local -> {ip} on port 53")
+        fqdn = f"{MDNS_NAME}.local"
+        names = (fqdn.lower(), MDNS_NAME.lower())
+        logging.info(f"DNS: {fqdn} -> {ip}")
         while not stop.is_set():
             try:
                 data, addr = sock.recvfrom(512)
                 req = DNSRecord.parse(data)
                 q = req.q
                 qn = str(q.qname).rstrip('.').lower()
-                if q.qtype == QTYPE.A and qn in ('streamdeck.local', 'streamdeck'):
+                if q.qtype == QTYPE.A and qn in names:
                     reply = DNSRecord(DNSHeader(id=req.header.id, qr=1, aa=1, ra=1), q=req.q)
                     reply.add_answer(RR(q.qname, QTYPE.A, ttl=30, rdata=A(ip)))
                     sock.sendto(reply.pack(), addr)
@@ -98,16 +121,15 @@ try:
 except ImportError:
     def start_dns(ip): pass
     def stop_dns(): pass
-    logging.info("DNS: pip install dnslib for streamdeck.local DNS forwarder")
+    logging.info("DNS: pip install dnslib for DNS forwarder")
 
+# --- Core Audio COM volume (silent, no OSD) ---
 user32 = ctypes.windll.user32
 WM_APPCOMMAND = 0x0319
 APPCOMMAND_MEDIA_PLAY_PAUSE = 14
 APPCOMMAND_MEDIA_NEXT_TRACK = 11
 APPCOMMAND_MEDIA_PREV_TRACK = 12
 
-# --- Core Audio COM volume (silent, no OSD popup) ---
-VOLUME_STEP = 0.05
 try:
     import comtypes
     from comtypes import CLSCTX_ALL, POINTER, cast
@@ -218,7 +240,7 @@ def main():
     args = parser.parse_args()
     if args.list: return list_ports()
 
-    port = args.port or find_esp32()
+    port = args.port or (SERIAL_PORT if SERIAL_PORT != "auto" else None) or find_esp32()
     if not port:
         logging.error("No ESP32 found")
         list_ports()
@@ -226,7 +248,7 @@ def main():
 
     for attempt in range(30):
         try:
-            ser = serial.Serial(port, 115200, timeout=0.05)
+            ser = serial.Serial(port, SERIAL_BAUD, timeout=SERIAL_TIMEOUT)
             break
         except serial.SerialException as e:
             logging.error(f"Failed ({attempt+1}/30): {e}")
@@ -237,7 +259,7 @@ def main():
 
     time.sleep(1)
     ser.reset_input_buffer()
-    logging.info(f"Listening on {port}")
+    logging.info(f"Listening on {port} ({SERIAL_BAUD} baud)")
 
     while True:
         try:

@@ -1,0 +1,7 @@
+{
+    "mdns_name": "streamdeck",
+    "serial_port": "auto",
+    "serial_baud": 115200,
+    "serial_timeout": 0.05,
+    "volume_step": 0.05
+}

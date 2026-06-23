@@ -11,6 +11,7 @@
 #define SERIAL_BAUD 115200
 #define MDNS_NAME "streamdeck"
 #define CONFIG_FILE "/config.json"
+#define SETTINGS_FILE "/settings.json"
 #define MAX_CONFIG_SIZE 4096
 #define LED_PIN 2
 #define FACTORY_PIN 0
@@ -18,6 +19,7 @@
 
 enum LedPattern { LED_OFF, LED_SOLID, LED_BLINK_FAST, LED_BLINK_SLOW, LED_BREATH, LED_PULSE_ACTION };
 
+static String mdnsName = MDNS_NAME;
 static LedPattern ledPattern = LED_BREATH;
 static unsigned long lastLedTick = 0;
 static bool ledState = false;
@@ -111,6 +113,17 @@ void saveConfig() {
     f.close();
 }
 
+void loadSettings() {
+    File f = LittleFS.open(SETTINGS_FILE, "r");
+    if (!f) return;
+    StaticJsonDocument<256> doc;
+    deserializeJson(doc, f);
+    f.close();
+    if (doc["mdns_name"].is<const char*>()) {
+        mdnsName = doc["mdns_name"].as<String>();
+    }
+}
+
 void sendSerialAction(const char* action, const char* value) {
     if (strlen(value) > 0) {
         Serial.print(action);
@@ -172,7 +185,7 @@ void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventTyp
             } else if (!strcmp(type, "info")) {
                 DynamicJsonDocument info(256);
                 info["ip"] = WiFi.localIP().toString();
-                info["hostname"] = String(MDNS_NAME) + ".local";
+                info["hostname"] = mdnsName + ".local";
                 info["uptime"] = millis() / 1000;
                 info["rssi"] = WiFi.RSSI();
                 String out;
@@ -184,7 +197,7 @@ void onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventTyp
 }
 
 void setupOTA() {
-    ArduinoOTA.setHostname(MDNS_NAME);
+    ArduinoOTA.setHostname(mdnsName.c_str());
     ArduinoOTA.onStart([]() {
         setLedPattern(LED_BLINK_FAST);
         Serial.println("[OTA] start");
@@ -222,10 +235,10 @@ void setupWiFi() {
 }
 
 void setupMDNS() {
-    if (MDNS.begin(MDNS_NAME)) {
+    if (MDNS.begin(mdnsName.c_str())) {
         MDNS.addService("http", "tcp", 80);
         MDNS.addService("ws", "tcp", 80);
-        Serial.printf("[mDNS] http://%s.local\n", MDNS_NAME);
+        Serial.printf("[mDNS] http://%s.local\n", mdnsName.c_str());
     }
 }
 
@@ -264,7 +277,7 @@ void setupServer() {
     server.on("/api/info", HTTP_GET, [](AsyncWebServerRequest* request) {
         DynamicJsonDocument doc(256);
         doc["ip"] = WiFi.localIP().toString();
-        doc["hostname"] = String(MDNS_NAME) + ".local";
+        doc["hostname"] = mdnsName + ".local";
         doc["uptime"] = millis() / 1000;
         doc["rssi"] = WiFi.RSSI();
         doc["version"] = "2.0";
@@ -313,6 +326,7 @@ void setup() {
 
     setupFS();
     loadConfig();
+    loadSettings();
     setupWiFi();
     setupMDNS();
     setupOTA();
