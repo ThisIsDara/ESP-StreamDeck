@@ -1,0 +1,12 @@
+{
+    "buttons": [
+        { "id": 0, "label": "Play/Pause", "action": "PLAY_PAUSE", "value": "", "color": "#e74c3c" },
+        { "id": 1, "label": "Next",       "action": "NEXT_TRACK", "value": "", "color": "#3498db" },
+        { "id": 2, "label": "Previous",   "action": "PREV_TRACK", "value": "", "color": "#3498db" },
+        { "id": 3, "label": "Vol +",      "action": "VOL_UP",    "value": "", "color": "#2ecc71" },
+        { "id": 4, "label": "Vol -",      "action": "VOL_DOWN",  "value": "", "color": "#2ecc71" },
+        { "id": 5, "label": "Mute",       "action": "MUTE",      "value": "", "color": "#f39c12" },
+        { "id": 6, "label": "Save",       "action": "KEY_COMBO", "value": "Ctrl+S", "color": "#9b59b6" },
+        { "id": 7, "label": "Task View",  "action": "KEY_COMBO", "value": "Win+Tab", "color": "#1abc9c" }
+    ]
+}

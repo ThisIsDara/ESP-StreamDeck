@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Stream Deck</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div id="brand">
+      <div id="brand-icon">▤</div>
+      <span>Stream Deck</span>
+    </div>
+    <div id="header-right">
+      <span id="status-dot"></span>
+      <button id="gear-btn" onclick="openConfig()">⚙</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="volume-bar">
+    <span id="vol-icon">🔊</span>
+    <input type="range" id="vol-slider" min="0" max="100" value="50">
+    <span id="vol-label">50%</span>
+  </div>
+
+  <div id="grid"></div>
+
+  <button id="add-btn" onclick="addButton()">+ Add Button</button>
+</div>
+
+<div id="config-overlay" class="hidden" onclick="closeConfig(event)">
+  <div id="config-modal" onclick="event.stopPropagation()">
+    <div id="config-header">
+      <span>Edit Buttons</span>
+      <button id="config-close" onclick="closeConfig()">✕</button>
+    </div>
+    <div id="config-list"></div>
+    <div id="config-actions">
+      <button id="config-save" onclick="saveConfig()">Save</button>
+      <button id="config-restart" onclick="restartESP()">Restart</button>
+    </div>
+    <div id="config-status"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
