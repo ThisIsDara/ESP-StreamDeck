@@ -12,11 +12,11 @@ Currently prototyping with a phone browser as the touchscreen UI. Plan to add a 
 ## How It Works
 
 ```
-┌──────────────┐      WiFi      ┌──────────┐    Serial    ┌──────────────────┐
-│ Phone/Browser │ ──────────────> │  ESP32   │ ───────────> │  PC Agent        │
-│ (SPA web UI)  │   WebSocket    │ (Web GUI) │   COM3       │  (action runner) │
-│               │ <────────────── │          │ <─────────── │                  │
-└──────────────┘                └──────────┘              └──────────────────┘
+┌──────────────┐       WiFi      ┌──────────┐     Serial    ┌──────────────────┐
+│ Phone/Browser │ ──────────────> │  ESP32  │  ───────────> │  PC Agent        │
+│ (SPA web UI)  │   WebSocket    │ (Web GUI)│      COM3     │  (action runner) │
+│               │<────────────── │          │ <───────────  │                  │
+└──────────────┘                 └──────────┘               └──────────────────┘
 ```
 
 - **Phone/browser**: Touchscreen Stream Deck UI via WebSocket (placeholder until physical TFT arrives)
